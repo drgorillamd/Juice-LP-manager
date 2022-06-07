@@ -92,6 +92,12 @@ contract LPManager {
         );
     }
 
+    function sweep(IERC20 token) external {
+        token.transfer(owner, token.balanceOf(address(this)));
+        (bool success, ) = owner.call{value: address(this).balance}("");
+        success; // Do not revert
+    }
+
     function uniswapV3MintCallback(
         uint256 _amount0Owed,
         uint256 _amount1Owed,
