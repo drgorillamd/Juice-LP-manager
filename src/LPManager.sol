@@ -8,104 +8,73 @@ import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "sqrt/FixedPointMathLib.sol";
-
 contract LPManager {
+    struct Position {
+        int24 tickLower;
+        int24 tickUpper;
+        uint128 amount;
+    }
 
-  struct Position {
-    int24 tickLower,
-    int24 tickUpper,
-    uint128 amount
-  }
+    // Pool=>Positions[]
+    mapping(IUniswapV3Pool => Position[]) public currentPositions;
 
-  IERC20 public immutable JBX;
+    address immutable owner;
 
-  IERC20 public immutable WETH;
+    constructor() payable {
+        owner = msg.sender;
+    }
 
-  // Pool=>Positions[]
-  mapping(IUniswapV3Pool=>Position[]) public currentPositions;
+    function addLP(
+        IUniswapV3Pool _pool,
+        address token0,
+        address token1,
+        uint160 _sqrtPriceX96,
+        uint256 _amount0,
+        uint256 _amount1,
+        int24 _tickLower,
+        int24 _tickUpper
+    ) external {
+        uint128 _liquidity = LiquidityAmounts.getLiquidityForAmounts(
+            _sqrtPriceX96,
+            TickMath.getSqrtRatioAtTick(_tickLower),
+            TickMath.getSqrtRatioAtTick(_tickUpper),
+            _amount0,
+            _amount1
+        );
 
-  address immutable owner;
+        _pool.mint(
+            address(this),
+            _tickLower,
+            _tickUpper,
+            _liquidity,
+            abi.encode(_pool, token0, token1)
+        );
 
-  constructor() payable {
-    owner = msg.sender;
-  }
+        currentPositions[_pool].push(
+            Position({
+                tickLower: _tickLower,
+                tickUpper: _tickUpper,
+                amount: _liquidity
+            })
+        );
+    }
 
-  function addLP(
-    IUniswapV3Pool pool,
-  uint256 amount0,
-    uint256 amount1
-  ) external {
+    function uniswapV3MintCallback(
+        uint256 _amount0Owed,
+        uint256 _amount1Owed,
+        bytes calldata _data
+    ) external {
+        (address _pool, address _token0, address _token1) = abi.decode(
+            _data,
+            (address, address, address)
+        );
+        if (msg.sender != _pool) revert();
 
-      int24 tickSpacing = pool.tickSpacing();
-      () = pool.slot0();
-      int24 _tickUpper = _MAX_TICK - (_MAX_TICK % tickSpacing);
-      int24 _tickLower = -_tickUpper;
+        if (_amount0Owed > 0)
+            IERC20(_token0).transferFrom(tx.origin, _pool, _amount0Owed);
+        if (_amount1Owed > 0)
+            IERC20(_token1).transferFrom(tx.origin, _pool, _amount1Owed);
+    }
 
-      uint128 _liquidity = LiquidityAmounts.getLiquidityForAmounts(
-          ,
-          TickMath.getSqrtRatioAtTick(_tickLower),
-          TickMath.getSqrtRatioAtTick(_tickUpper),
-          amount0,
-          amount1
-      );
-
-      pool.mint(
-          address(this),
-          _tickLower,
-          _tickUpper,
-          _liquidity,
-          abi.encode(_donor)
-      );
-
-      _positionsLowerTicks.push(_tickLower);
-      _positionStorage[_tickLower] = LiquidityPosition(
-          _tickLower,
-          _tickUpper,
-          _liquidity
-      );
-  }
-
-  function uniswapV3MintCallback(
-      uint256 _amount0Owed,
-      uint256 _amount1Owed,
-      bytes calldata _data
-  ) external {
-      if (msg.sender != address(pool)) revert PoolManager_OnlyPool();
-
-      address _donor = abi.decode(_data, (address));
-
-      if (_donor == address(0)) {
-          // called from updatePositions, should mint needed PRICE
-          mintedPrice += _isPriceToken0 ? _amount0Owed : _amount1Owed;
-
-          uint256 _mintable = ITierManager(tierManager).mintableAmount(
-              lockManager,
-              IPoolManager(address(this))
-          );
-
-          if (mintedPrice > _mintable)
-              revert PoolManager_OverlimitMint(_mintable, mintedPrice);
-
-          _isPriceToken0
-              ? price.mint(address(pool), _amount0Owed)
-              : price.mint(address(pool), _amount1Owed);
-      } else {
-          // called from createAndInitializePoolIfNecessary, should transferFrom PRICE and tokenA from donor
-          if (_amount0Owed > 0)
-              IERC20(_token0).transferFrom(
-                  _donor,
-                  address(pool),
-                  _amount0Owed
-              );
-          if (_amount1Owed > 0)
-              IERC20(_token1).transferFrom(
-                  _donor,
-                  address(pool),
-                  _amount1Owed
-              );
-      }
-  }
-
-  function collectFees(Position[] calldata _positions) external {}
+    function collectFees(Position[] calldata _positions) external {}
 }
