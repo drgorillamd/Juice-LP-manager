@@ -7,6 +7,8 @@ remappings = [
     '@chainlink=lib/chainlink/',
     '@openzeppelin=lib/openzeppelin-contracts',
     '@paulrberg/contracts/math/=lib/prb-math/contracts',
+    '@uniswap/v3-core/=lib/uniswap-v3-core',
+    '@uniswap/v3-periphery/=lib/uniswap-v3-periphery',
     'prb-math=lib/prb-math/',
     'forge-std/=lib/forge-std/src/',
 ]
