@@ -13,3 +13,6 @@
 [submodule "lib/juice-contracts-v2"]
 	path = lib/juice-contracts-v2
 	url = https://github.com/jbx-protocol/juice-contracts-v2
+[submodule "lib/uniswap-v3-core"]
+	path = lib/uniswap-v3-core
+	url = https://github.com/lbertenasco/uniswap-v3-core
