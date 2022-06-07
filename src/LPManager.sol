@@ -10,13 +10,7 @@ import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface IWETH9 is IERC20 {
-    /// @notice Deposit ether to get wrapped ether
-    function deposit() external payable;
-
-    /// @notice Withdraw wrapped ether to get ether
-    function withdraw(uint256) external;
-}
+import "./interfaces/external/IWETH9.sol";
 
 /**
     @title
@@ -45,7 +39,7 @@ contract LPManager {
     @dev
     Approval or msg.value should be set/use accordingly to the amounts desired
     The new position ticks and liquidity is NOT tracked by this contract, instead, use
-    offchain accounting (like the Uniswap V3 subgraph, using the following query:
+    offchain accounting (like the Uniswap V3 subgraph, using the following query for instance:
     https://thegraph.com/hosted-service/subgraph/uniswap/uniswap-v3
 
         {
@@ -171,27 +165,31 @@ contract LPManager {
         bytes calldata _data
     ) external {
         // access control: only a valid uniswap pool can be calling this
-        (address _factory, address _token0, address _token1, uint24 _fee) = abi
-            .decode(_data, (address, address, address, uint24));
+        (
+            address caller,
+            address _factory,
+            address _token0,
+            address _token1,
+            uint24 _fee
+        ) = abi.decode(_data, (address, address, address, address, uint24));
 
         address _pool = PoolAddress.computeAddress(
             _factory,
             PoolAddress.getPoolKey(_token0, _token1, _fee)
         );
+        //if (msg.sender != _pool) revert();
 
-        if (msg.sender != _pool) revert();
-
-        if (_amount0Owed > 0) {
+        if (_amount0Owed > 0)
             if (_token0 == address(WETH)) {
                 // ETH should have been passed with msg.value
                 WETH.deposit{value: _amount0Owed}();
                 WETH.transfer(_pool, _amount0Owed);
-            } else IERC20(_token0).transferFrom(tx.origin, _pool, _amount0Owed);
-        }
+            } else IERC20(_token0).transferFrom(caller, _pool, _amount0Owed);
+
         if (_amount1Owed > 0)
             if (_token1 == address(WETH)) {
                 WETH.deposit{value: _amount1Owed}();
                 WETH.transfer(_pool, _amount1Owed);
-            } else IERC20(_token1).transferFrom(tx.origin, _pool, _amount1Owed);
+            } else IERC20(_token1).transferFrom(caller, _pool, _amount1Owed);
     }
 }
