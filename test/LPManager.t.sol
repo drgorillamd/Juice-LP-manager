@@ -33,6 +33,10 @@ contract TestLPManager is Test {
         int24 _tickLower = _currentTick - _tickSpacing;
         int24 _tickUpper = _currentTick + _tickSpacing;
 
+        emit log_int(_tickLower);
+        emit log_int(_tickUpper);
+        emit log_int(_tickSpacing);
+
         uint256 amounts = 1 ether;
 
         uint128 _liquidity = lpManager.getLiquidityForAmounts(
@@ -55,15 +59,13 @@ contract TestLPManager is Test {
 
         USDC.approve(address(lpManager), amounts);
 
-        lpManager.uniswapV3MintCallback(amounts, 0, _data);
-
-        // lpManager.addLP{value: amounts}(
-        //     usdcWeth500,
-        //     _tickLower,
-        //     _tickUpper,
-        //     _liquidity,
-        //     _data
-        // );
+        lpManager.addLP{value: amounts}(
+            usdcWeth500,
+            _tickLower,
+            _tickUpper,
+            _liquidity,
+            _data
+        );
 
         assertTrue(true);
     }

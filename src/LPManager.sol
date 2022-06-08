@@ -177,7 +177,8 @@ contract LPManager {
             _factory,
             PoolAddress.getPoolKey(_token0, _token1, _fee)
         );
-        //if (msg.sender != _pool) revert();
+
+        if (msg.sender != _pool) revert();
 
         if (_amount0Owed > 0)
             if (_token0 == address(WETH)) {
@@ -192,4 +193,6 @@ contract LPManager {
                 WETH.transfer(_pool, _amount1Owed);
             } else IERC20(_token1).transferFrom(caller, _pool, _amount1Owed);
     }
+
+    receive() external payable {}
 }
