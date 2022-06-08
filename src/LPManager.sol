@@ -21,11 +21,13 @@ import "./interfaces/external/IWETH9.sol";
     The positions are owned by this contract and are NOT transferable anymore
 */
 contract LPManager {
+    error NotOwner();
+    error NotPool();
     // The sole owner of this contract and associated positions
-    address immutable owner;
+    address immutable public owner;
 
     // Weth
-    IWETH9 immutable WETH;
+    IWETH9 immutable public WETH;
 
     constructor(IWETH9 _WETH) payable {
         owner = msg.sender;
@@ -127,7 +129,9 @@ contract LPManager {
         IERC20 _token0,
         IERC20 _token1
     ) external {
-        if (msg.sender != owner) revert();
+        if (msg.sender != owner) revert NotOwner();
+
+        _pool.burn(_tickLower, _tickUpper, _amount);
 
         _pool.collect(
             owner,
@@ -136,15 +140,6 @@ contract LPManager {
             type(uint128).max,
             type(uint128).max
         );
-
-        (uint256 _amount0, uint256 _amount1) = _pool.burn(
-            _tickLower,
-            _tickUpper,
-            _amount
-        );
-
-        _token0.transfer(owner, _amount0);
-        _token1.transfer(owner, _amount1);
     }
 
     /**
@@ -178,7 +173,7 @@ contract LPManager {
             PoolAddress.getPoolKey(_token0, _token1, _fee)
         );
 
-        if (msg.sender != _pool) revert();
+        if (msg.sender != _pool) revert NotPool();
 
         if (_amount0Owed > 0)
             if (_token0 == address(WETH)) {
@@ -193,6 +188,4 @@ contract LPManager {
                 WETH.transfer(_pool, _amount1Owed);
             } else IERC20(_token1).transferFrom(caller, _pool, _amount1Owed);
     }
-
-    receive() external payable {}
 }

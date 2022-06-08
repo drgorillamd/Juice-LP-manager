@@ -9,5 +9,12 @@ out/
 # Config files
 .env
 
+#Hardhat files
+artifacts
+cache
+coverage
+coverage.json
+typechain
+
 # Not ignore gitkeep
 !/**/.gitkeep

@@ -3,6 +3,10 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
+import "@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol";
+
+import "@uniswap/v3-core/contracts/libraries/TickMath.sol";
+
 import "../src/LPManager.sol";
 import "../src/interfaces/external/IWETH9.sol";
 
@@ -18,6 +22,7 @@ contract TestLPManager is Test {
     address caller = address(69420);
 
     function setUp() public {
+        vm.prank(caller);
         lpManager = new LPManager(WETH);
 
         // Money printer goes brrrr
@@ -31,8 +36,9 @@ contract TestLPManager is Test {
         vm.label(address(caller), "caller");
     }
 
-    function testExample() public {
-        (, int24 _currentTick, , , , , ) = usdcWeth500.slot0();
+    function testCreateCenteredLP() public {
+        (uint160 sqrtRatioX96, int24 _currentTick, , , , , ) = usdcWeth500
+            .slot0();
 
         int24 _tickSpacing = usdcWeth500.tickSpacing();
 
@@ -40,11 +46,6 @@ contract TestLPManager is Test {
             (_currentTick % _tickSpacing);
         int24 _tickUpper = (_currentTick + 1 * _tickSpacing) +
             (_tickSpacing - (_currentTick % _tickSpacing));
-
-        emit log_int(_currentTick);
-        emit log_int(_tickLower);
-        emit log_int(_tickUpper);
-        emit log_int(_tickSpacing);
 
         uint256 amounts = 1 ether;
 
@@ -68,6 +69,9 @@ contract TestLPManager is Test {
 
         USDC.approve(address(lpManager), amounts);
 
+        uint256 USDCBalanceBefore = USDC.balanceOf(caller);
+        uint256 ETHBalanceBefore = caller.balance;
+
         lpManager.addLP{value: amounts}(
             usdcWeth500,
             _tickLower,
@@ -78,6 +82,87 @@ contract TestLPManager is Test {
 
         vm.stopPrank();
 
-        assertTrue(true);
+        (
+            uint256 amount0theoricForLiquidity,
+            uint256 amount1theoricForLiquidity
+        ) = LiquidityAmounts.getAmountsForLiquidity(
+                sqrtRatioX96,
+                TickMath.getSqrtRatioAtTick(_tickLower),
+                TickMath.getSqrtRatioAtTick(_tickUpper),
+                _liquidity
+            );
+
+        assertApproxEqRel(
+            USDCBalanceBefore - USDC.balanceOf(caller),
+            amount0theoricForLiquidity,
+            10E13 //0.000001%
+        );
+        assertApproxEqRel(
+            ETHBalanceBefore - caller.balance,
+            amount1theoricForLiquidity,
+            10E13
+        );
+    }
+
+    function testRemoveLP() public {
+        (uint160 sqrtRatioX96, int24 _currentTick, , , , , ) = usdcWeth500
+            .slot0();
+
+        int24 _tickSpacing = usdcWeth500.tickSpacing();
+
+        int24 _tickLower = (_currentTick - 1 * _tickSpacing) -
+            (_currentTick % _tickSpacing);
+        int24 _tickUpper = (_currentTick + 1 * _tickSpacing) +
+            (_tickSpacing - (_currentTick % _tickSpacing));
+
+        uint256 amounts = 1 ether;
+
+        uint128 _liquidity = lpManager.getLiquidityForAmounts(
+            amounts, //usdc
+            amounts, //weth
+            _tickLower,
+            _tickUpper,
+            usdcWeth500
+        );
+
+        bytes memory _data = abi.encode(
+            caller,
+            usdcWeth500.factory(),
+            address(USDC),
+            address(WETH),
+            uint24(500)
+        );
+
+        vm.startPrank(caller);
+
+        USDC.approve(address(lpManager), amounts);
+
+        uint256 USDCBalanceBefore = USDC.balanceOf(caller);
+        uint256 ETHBalanceBefore = caller.balance;
+
+        lpManager.addLP{value: amounts}(
+            usdcWeth500,
+            _tickLower,
+            _tickUpper,
+            _liquidity,
+            _data
+        );
+
+        uint256 USDCBalanceAfter = USDC.balanceOf(caller);
+        uint256 ETHBalanceAfter = caller.balance;
+
+        lpManager.removeLP(
+            _tickLower,
+            _tickUpper,
+            _liquidity,
+            usdcWeth500,
+            USDC,
+            WETH
+        );
+
+        vm.stopPrank();
+
+        assertApproxEqRel(USDC.balanceOf(caller), USDCBalanceBefore, 10E13);
+        assertApproxEqRel(WETH.balanceOf(caller), amounts, 10E13);
     }
 }
