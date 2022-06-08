@@ -23,6 +23,12 @@ contract TestLPManager is Test {
         // Money printer goes brrrr
         deal(address(USDC), caller, 100 ether);
         deal(caller, 100 ether);
+
+        vm.label(address(USDC), "USDC");
+        vm.label(address(WETH), "WETH");
+        vm.label(address(usdcWeth500), "usdcWeth500");
+        vm.label(address(lpManager), "lpManager");
+        vm.label(address(caller), "caller");
     }
 
     function testExample() public {
@@ -30,9 +36,12 @@ contract TestLPManager is Test {
 
         int24 _tickSpacing = usdcWeth500.tickSpacing();
 
-        int24 _tickLower = _currentTick - _tickSpacing;
-        int24 _tickUpper = _currentTick + _tickSpacing;
+        int24 _tickLower = (_currentTick - 1 * _tickSpacing) -
+            (_currentTick % _tickSpacing);
+        int24 _tickUpper = (_currentTick + 1 * _tickSpacing) +
+            (_tickSpacing - (_currentTick % _tickSpacing));
 
+        emit log_int(_currentTick);
         emit log_int(_tickLower);
         emit log_int(_tickUpper);
         emit log_int(_tickSpacing);
@@ -66,6 +75,8 @@ contract TestLPManager is Test {
             _liquidity,
             _data
         );
+
+        vm.stopPrank();
 
         assertTrue(true);
     }
